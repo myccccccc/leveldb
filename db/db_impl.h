@@ -109,7 +109,7 @@ class DBImpl : public DB {
 
   Status NewDB();
 
-  Status RecoverDurableSnapshot();
+  Status RecoverDurableSnapshot() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   // Recover the descriptor from persistent storage.  May do a significant
   // amount of work to recover recently logged updates.  Any changes to
   // be made to the descriptor are added to *edit.
