@@ -101,6 +101,10 @@ class LEVELDB_EXPORT DB {
   // snapshot is no longer needed.
   virtual const Snapshot* GetSnapshot() = 0;
 
+  virtual uint64_t GetDurableSnapshot() = 0;
+
+  virtual void ReleaseDurableSnapshot(uint64_t seq) = 0;
+
   // Release a previously acquired snapshot.  The caller must not
   // use "snapshot" after this call.
   virtual void ReleaseSnapshot(const Snapshot* snapshot) = 0;

@@ -85,6 +85,17 @@ class SnapshotList {
     delete snapshot;
   }
 
+  void Delete(uint64_t seq) {
+    auto i = head_.prev_;
+    while (i != &head_) {
+     if (i->sequence_number() == seq) {
+       Delete(i);
+       break;
+     }
+     i = i->prev_; 
+    }
+    return;
+  }
  private:
   // Dummy head of doubly-linked list of snapshots
   SnapshotImpl head_;

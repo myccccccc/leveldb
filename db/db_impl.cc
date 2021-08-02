@@ -140,6 +140,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       imm_(nullptr),
       has_imm_(false),
       logfile_(nullptr),
+      durable_snapshots_file_(nullptr),
       logfile_number_(0),
       log_(nullptr),
       seed_(0),
@@ -167,6 +168,7 @@ DBImpl::~DBImpl() {
   if (imm_ != nullptr) imm_->Unref();
   delete tmp_batch_;
   delete log_;
+  delete durable_snapshots_file_;
   delete logfile_;
   delete table_cache_;
 
@@ -287,6 +289,25 @@ void DBImpl::RemoveObsoleteFiles() {
     env_->RemoveFile(dbname_ + "/" + filename);
   }
   mutex_.Lock();
+}
+
+Status DBImpl::RecoverDurableSnapshot() {
+  std::string durable_snapshots_file_name = dbname_+".durablesnapshot";
+  SequentialFile* f;
+  Status s = env_->NewSequentialFile(durable_snapshots_file_name, &f);
+  if (s.ok()) {
+    char scratch[sizeof(uint64_t)];
+    Slice result;
+    uint64_t snapshot_seq;
+    while (f->Read(sizeof(uint64_t), &result, scratch).ok()) {
+      if (result.size() != sizeof(uint64_t)) break;
+      snapshot_seq = DecodeFixed64(result.data());
+      snapshots_.New(snapshot_seq);
+    }
+  }
+  delete f;
+
+  return env_->NewWritableFile(durable_snapshots_file_name, &durable_snapshots_file_);
 }
 
 Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
@@ -1183,6 +1204,28 @@ const Snapshot* DBImpl::GetSnapshot() {
   return snapshots_.New(versions_->LastSequence());
 }
 
+uint64_t DBImpl::GetDurableSnapshot() {
+  uint64_t seq;
+  {
+    MutexLock l(&mutex_);
+    seq = versions_->LastSequence();
+    snapshots_.New(seq);
+  }
+
+  // write to durable storage
+  std::string value;
+  PutFixed64(&value, seq);
+  durable_snapshots_file_->Append(value);
+  durable_snapshots_file_->Sync();
+
+  return seq;
+}
+
+void DBImpl::ReleaseDurableSnapshot(uint64_t seq) {
+  MutexLock l(&mutex_);
+  snapshots_.Delete(seq);
+}
+
 void DBImpl::ReleaseSnapshot(const Snapshot* snapshot) {
   MutexLock l(&mutex_);
   snapshots_.Delete(static_cast<const SnapshotImpl*>(snapshot));
@@ -1488,7 +1531,13 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
   VersionEdit edit;
   // Recover handles create_if_missing, error_if_exists
   bool save_manifest = false;
-  Status s = impl->Recover(&edit, &save_manifest);
+  Status s = impl->RecoverDurableSnapshot();
+  if (!s.ok()) {
+    impl->mutex_.Unlock();
+    delete impl;
+    return s;
+  }
+  s = impl->Recover(&edit, &save_manifest);
   if (s.ok() && impl->mem_ == nullptr) {
     // Create new log and a corresponding memtable.
     uint64_t new_log_number = impl->versions_->NewFileNumber();

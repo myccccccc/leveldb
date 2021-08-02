@@ -44,6 +44,8 @@ class DBImpl : public DB {
              std::string* value) override;
   Iterator* NewIterator(const ReadOptions&) override;
   const Snapshot* GetSnapshot() override;
+  uint64_t GetDurableSnapshot() override;
+  void ReleaseDurableSnapshot(uint64_t seq) override;
   void ReleaseSnapshot(const Snapshot* snapshot) override;
   bool GetProperty(const Slice& property, std::string* value) override;
   void GetApproximateSizes(const Range* range, int n, uint64_t* sizes) override;
@@ -107,6 +109,7 @@ class DBImpl : public DB {
 
   Status NewDB();
 
+  Status RecoverDurableSnapshot();
   // Recover the descriptor from persistent storage.  May do a significant
   // amount of work to recover recently logged updates.  Any changes to
   // be made to the descriptor are added to *edit.
@@ -178,6 +181,7 @@ class DBImpl : public DB {
   MemTable* imm_ GUARDED_BY(mutex_);  // Memtable being compacted
   std::atomic<bool> has_imm_;         // So bg thread can detect non-null imm_
   WritableFile* logfile_;
+  WritableFile* durable_snapshots_file_;
   uint64_t logfile_number_ GUARDED_BY(mutex_);
   log::Writer* log_;
   uint32_t seed_ GUARDED_BY(mutex_);  // For sampling.

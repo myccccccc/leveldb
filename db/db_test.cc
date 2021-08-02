@@ -2080,6 +2080,14 @@ class ModelDB : public DB {
     return snapshot;
   }
 
+  uint64_t GetDurableSnapshot() override {
+    return 0;
+  }
+  
+  void ReleaseDurableSnapshot(uint64_t seq) override {
+    return;
+  }
+
   void ReleaseSnapshot(const Snapshot* snapshot) override {
     delete reinterpret_cast<const ModelSnapshot*>(snapshot);
   }
