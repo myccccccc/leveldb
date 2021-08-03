@@ -2059,7 +2059,7 @@ class ModelDB : public DB {
     return DB::Delete(o, key);
   }
   Status Get(const ReadOptions& options, const Slice& key,
-             std::string* value) override {
+             std::string* value, uint64_t durable_snapthot = 0) override {
     assert(false);  // Not implemented
     return Status::NotFound(key);
   }

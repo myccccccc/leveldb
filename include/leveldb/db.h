@@ -85,7 +85,7 @@ class LEVELDB_EXPORT DB {
   //
   // May return some other Status on an error.
   virtual Status Get(const ReadOptions& options, const Slice& key,
-                     std::string* value) = 0;
+                     std::string* value, uint64_t durable_snapshot = 0) = 0;
 
   // Return a heap-allocated iterator over the contents of the database.
   // The result of NewIterator() is initially invalid (caller must

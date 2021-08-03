@@ -1134,13 +1134,15 @@ int64_t DBImpl::TEST_MaxNextLevelOverlappingBytes() {
 }
 
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
-                   std::string* value) {
+                   std::string* value, uint64_t durable_snaphot) {
   Status s;
   MutexLock l(&mutex_);
   SequenceNumber snapshot;
   if (options.snapshot != nullptr) {
     snapshot =
         static_cast<const SnapshotImpl*>(options.snapshot)->sequence_number();
+  } else if (durable_snaphot != 0) {
+    snapshot = durable_snaphot;
   } else {
     snapshot = versions_->LastSequence();
   }
